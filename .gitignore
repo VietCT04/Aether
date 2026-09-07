@@ -1,0 +1,12 @@
+# Build artifacts
+event_scan
+*.o
+*.out
+
+# Build directories
+build/
+bin/
+
+# IDE / OS
+.vscode/
+.DS_Store
