@@ -66,6 +66,19 @@ bool OrderBook::trade(const Event& event) {
     return true;
 }
 
+bool OrderBook::apply(const Event& event) {
+    switch (event.type) {
+        case EventType::Add:
+            return add(event);
+        case EventType::Cancel:
+            return cancel(event);
+        case EventType::Trade:
+            return trade(event);
+    }
+
+    return false;
+}
+
 std::optional<int64_t> OrderBook::best_bid() const {
     if (bids_.empty()) return std::nullopt;
     return bids_.begin()->first;

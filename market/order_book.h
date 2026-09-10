@@ -8,6 +8,7 @@
 
 class OrderBook {
 public:
+    bool apply(const Event& event);
     bool add(const Event& event);
     bool cancel(const Event& event);
     bool trade(const Event& event);
