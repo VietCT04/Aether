@@ -10,40 +10,59 @@ bool OrderBook::add(const Event& event) {
     return true;
 }
 
-bool OrderBook::cancel(const Event& event){
+bool OrderBook::cancel(const Event& event) {
     if (event.type != EventType::Cancel) return false;
+
     auto it = orders_.find(event.order_id);
     if (it == orders_.end()) return false;
+
     auto [price, quantity, side] = it->second;
-    if (side == Side::Buy){
-        bids_[price] -= quantity;
-        if (bids_[price] == 0) bids_.erase(price);
+
+    if (side == Side::Buy) {
+        auto level = bids_.find(price);
+        if (level == bids_.end() || level->second < quantity) return false;
+
+        level->second -= quantity;
+        if (level->second == 0) bids_.erase(level);
     } else {
-        asks_[price] -= quantity;
-        if (asks_[price] == 0) asks_.erase(price);
+        auto level = asks_.find(price);
+        if (level == asks_.end() || level->second < quantity) return false;
+
+        level->second -= quantity;
+        if (level->second == 0) asks_.erase(level);
     }
+
     orders_.erase(it);
     return true;
 }
 
-bool OrderBook::trade(const Event& event){
+bool OrderBook::trade(const Event& event) {
     if (event.type != EventType::Trade) return false;
     if (event.quantity == 0) return false;
+
     auto it = orders_.find(event.order_id);
     if (it == orders_.end()) return false;
+
     auto& [price, quantity, side] = it->second;
     if (quantity < event.quantity) return false;
-    if (side == Side::Buy){
-        bids_[price] -= event.quantity;
-        if (bids_[price] == 0) bids_.erase(price);
+
+    if (side == Side::Buy) {
+        auto level = bids_.find(price);
+        if (level == bids_.end() || level->second < event.quantity) return false;
+
+        level->second -= event.quantity;
+        if (level->second == 0) bids_.erase(level);
     } else {
-        asks_[price] -= event.quantity;
-        if (asks_[price] == 0) asks_.erase(price); 
+        auto level = asks_.find(price);
+        if (level == asks_.end() || level->second < event.quantity) return false;
+
+        level->second -= event.quantity;
+        if (level->second == 0) asks_.erase(level);
     }
-    quantity = quantity - event.quantity;
-    if (quantity == 0){
-        orders_.erase(it);
-    }
+
+    quantity -= event.quantity;
+    if (quantity == 0) orders_.erase(it);
+
     return true;
 }
 
