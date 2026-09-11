@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/event_queue.h"
 #include <cstdint>
 #include <atomic>
 #include <cstddef>
@@ -8,11 +9,27 @@
 
 class EpollServer {
 public:
-    explicit EpollServer(uint16_t port);
+    EpollServer(uint16_t port, EventQueue& event_queue);
     ~EpollServer();
 
     EpollServer(const EpollServer&) = delete;
     EpollServer& operator=(const EpollServer&) = delete;
+
+    uint64_t events_decoded() const {
+        return events_decoded_.load(std::memory_order_relaxed);
+    }
+
+    uint64_t events_enqueued() const {
+        return events_enqueued_.load(std::memory_order_relaxed);
+    }
+
+    uint64_t invalid_events() const {
+        return invalid_events_.load(std::memory_order_relaxed);
+    }
+
+    uint64_t queue_full_count() const {
+        return queue_full_count_.load(std::memory_order_relaxed);
+    }
 
     void run();
     void stop();
@@ -32,6 +49,13 @@ private:
     uint64_t bytes_received_ = 0;
 
     std::unordered_map<int, Connection> clients_;
+
+    EventQueue& event_queue_;
+
+    std::atomic<uint64_t> events_decoded_{0};
+    std::atomic<uint64_t> events_enqueued_{0};
+    std::atomic<uint64_t> invalid_events_{0};
+    std::atomic<uint64_t> queue_full_count_{0};
 
     void setup_listener();
     void setup_epoll();

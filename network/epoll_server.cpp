@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <array>
 #include <iostream>
+#include "network/wire_decoder.h"
 
 void EpollServer::stop() {
     running_.store(false);
@@ -27,8 +28,12 @@ EpollServer::~EpollServer() {
     }
 }
 
-EpollServer::EpollServer(uint16_t port)
-    : port_(port) {
+EpollServer::EpollServer(
+    uint16_t port,
+    EventQueue& event_queue
+)
+    : port_(port),
+      event_queue_(event_queue) {
     try {
         setup_listener();
         setup_epoll();
@@ -100,12 +105,26 @@ void EpollServer::process_frames(Connection& connection) {
     std::size_t offset = 0;
 
     while (connection.buffer.size() - offset >= FRAME_SIZE) {
-        ++frames_completed_;
+        std::span<const std::byte> frame(
+            connection.buffer.data() + offset,
+            FRAME_SIZE
+        );
 
-        std::cout << "fd " << connection.fd
-                << " completed frame "
-                << frames_completed_
-                << '\n';
+        auto event = decode_event(frame);
+
+        if (!event.has_value()) {
+            ++invalid_events_;
+            offset += FRAME_SIZE;
+            continue;
+        }
+
+        ++events_decoded_;
+
+        while (!event_queue_.try_push(*event)) {
+            ++queue_full_count_;
+        }
+
+        ++events_enqueued_;
 
         offset += FRAME_SIZE;
     }
