@@ -14,8 +14,8 @@ void EpollServer::stop() {
 }
 
 EpollServer::~EpollServer() {
-    for (int fd : clients_) {
-        close(fd);
+    for (const auto& entry : clients_) {
+        close(entry.first);
     }
 
     if (listen_fd_ != -1) {
@@ -52,18 +52,35 @@ void EpollServer::remove_client(int fd) {
 }
 
 bool EpollServer::handle_client(int fd) {
-    std::array<char, 4096> buffer;
+    auto it = clients_.find(fd);
+    if (it == clients_.end()) {
+        return false;
+    }
+
+    Connection& connection = it->second;
+
+    std::array<std::byte, 4096> recv_buffer;
 
     while (true) {
-        ssize_t n = recv(fd, buffer.data(), buffer.size(), 0);
+        ssize_t n = recv(
+            fd,
+            recv_buffer.data(),
+            recv_buffer.size(),
+            0
+        );
 
         if (n > 0) {
+            std::cout << "Received " << n << std::endl;
             bytes_received_ += static_cast<uint64_t>(n);
-            std::cout << "fd " << fd
-                    << " received " << n
-                    << " bytes"
-                    << " | total = " << bytes_received_
-                    << '\n';
+
+            connection.buffer.insert(
+                connection.buffer.end(),
+                recv_buffer.begin(),
+                recv_buffer.begin() + n
+            );
+
+            process_frames(connection);
+
             continue;
         }
 
@@ -76,6 +93,28 @@ bool EpollServer::handle_client(int fd) {
         }
 
         return false;
+    }
+}
+
+void EpollServer::process_frames(Connection& connection) {
+    std::size_t offset = 0;
+
+    while (connection.buffer.size() - offset >= FRAME_SIZE) {
+        ++frames_completed_;
+
+        std::cout << "fd " << connection.fd
+                << " completed frame "
+                << frames_completed_
+                << '\n';
+
+        offset += FRAME_SIZE;
+    }
+
+    if (offset > 0) {
+        connection.buffer.erase(
+            connection.buffer.begin(),
+            connection.buffer.begin() + offset
+        );
     }
 }
 
@@ -138,7 +177,7 @@ void EpollServer::accept_clients() {
             throw std::runtime_error("epoll_ctl ADD client failed");
         }
 
-        clients_.insert(client_fd);
+        clients_.emplace(client_fd, Connection{client_fd, {}});
     }
 }
 
