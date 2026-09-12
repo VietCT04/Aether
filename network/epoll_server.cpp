@@ -75,7 +75,6 @@ bool EpollServer::handle_client(int fd) {
         );
 
         if (n > 0) {
-            std::cout << "Received " << n << std::endl;
             bytes_received_ += static_cast<uint64_t>(n);
 
             connection.buffer.insert(
