@@ -1,5 +1,68 @@
 # Aether Performance
 
+## End-to-End Pipeline
+
+### v0.1 — TCP → epoll → framing → decoder → SPSC → OrderBook
+
+### Environment
+
+- 1,000,000 events
+- 32-byte frames, 32 MB total
+- 50% ADD / 30% TRADE / 20% CANCEL
+- Seed: `42`
+- Queue capacity: `65,536`
+- Client / Network / Worker pinned to CPUs `2 / 4 / 6`
+- Separate physical P-cores
+- SMT siblings disabled
+- `performance` governor, turbo disabled
+- C++20, `-O3 -DNDEBUG -pthread`
+
+### Methodology
+
+- Workload and TCP connection prepared before timing
+- Timer: before transmission → all events processed
+- 5 independent processes
+- 1 warm-up + 5 measured runs per process
+- 25 measured runs total
+- Report median across all 25 runs
+- All runs validated with zero invalid/rejected/lost events
+
+### Results
+
+| Metric | Result |
+|---|---:|
+| Median | `243.446 ns/event` |
+| Throughput | `~4.11M events/s` |
+| Minimum | `184.395 ns/event` |
+| Maximum | `269.403 ns/event` |
+| Median of process medians | `242.850 ns/event` |
+
+### Perf Stat
+
+Median across 5 benchmark processes:
+
+| Metric | Median |
+|---|---:|
+| CPU cycles | `7.385B` |
+| Instructions | `4.868B` |
+| IPC | `0.660` |
+| Branch miss rate | `4.94%` |
+| Cache misses | `13.82M` |
+| Context switches | `309` |
+| CPU migrations | `13` |
+| Page faults | `26,633` |
+
+Perf counters cover the whole benchmark process, including setup, warm-up,
+and measured runs, so they are supplementary rather than hot-path
+per-event counters.
+
+### Notes
+
+- `ns/event` is amortized throughput cost, not per-event latency.
+- `queue_full_count` counts retry attempts, not dropped events.
+- Cross-process variance remains significant.
+- This is a development baseline for future A/B optimization comparisons.
+
 ## OrderBook
 
 ### v0.1 Baseline
