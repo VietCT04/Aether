@@ -3,8 +3,10 @@
 bool OrderBook::add(const Event& event) {
     if (event.type != EventType::Add) return false;
     if (event.quantity == 0) return false;
-    if (orders_.find(event.order_id) != orders_.end()) return false;
-    orders_[event.order_id] = Order{event.price, event.quantity, event.side};
+    if (!orders_.try_emplace(
+        event.order_id,
+        Order{event.price, event.quantity, event.side}
+    ).second) return false;
     if (event.side == Side::Buy) bids_[event.price] += event.quantity;
     else asks_[event.price] += event.quantity;
     return true;
