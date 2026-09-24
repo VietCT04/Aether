@@ -5,6 +5,7 @@
 #include <array>
 #include <atomic>
 #include <cstddef>
+#include <new>
 
 template <std::size_t Capacity>
 class SPSCQueue {
@@ -56,6 +57,8 @@ private:
     static constexpr std::size_t STORAGE_SIZE = Capacity + 1;
 
     std::array<Event, STORAGE_SIZE> buffer_;
+    alignas(std::hardware_destructive_interference_size)
     std::atomic<std::size_t> write_index_{0};
+    alignas(std::hardware_destructive_interference_size)
     std::atomic<std::size_t> read_index_{0};
 };
